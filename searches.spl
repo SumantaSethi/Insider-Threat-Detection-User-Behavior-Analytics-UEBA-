@@ -1,0 +1,33 @@
+# Create a Splunk index named ueba and ingest output/alerts.jsonl.
+# Replace index/sourcetype values if your setup uses different names.
+
+# 1. Recent high-risk events
+index=ueba sourcetype=ueba:alert
+| where risk_score >= 50
+| sort - risk_score
+| table timestamp user_id event_type risk_score severity reason
+
+# 2. Users with repeated alerts
+index=ueba sourcetype=ueba:alert
+| stats count as alert_count max(risk_score) as max_risk values(reason) as reasons by user_id
+| where alert_count >= 2
+| sort - max_risk
+
+# 3. Large transfers (10 MB threshold)
+index=ueba sourcetype=ueba:alert
+| where bytes_transferred >= 10000000
+| eval transfer_mb=round(bytes_transferred/1000000, 2)
+| table timestamp user_id transfer_mb files_accessed severity reason
+| sort - transfer_mb
+
+# 4. Total alert count
+index=ueba sourcetype=ueba:alert
+| stats count as total_alerts
+
+# 5. Severity distribution
+index=ueba sourcetype=ueba:alert
+| stats count by severity
+
+# 6. Alert trend
+index=ueba sourcetype=ueba:alert
+| timechart span=1h count
